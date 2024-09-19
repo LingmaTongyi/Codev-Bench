@@ -162,3 +162,22 @@ The predicted responses are as follows:
 ```
 
 We provide some examples in `./predicts/prefix_suffix_full_complete_current_block_no_evidence/predictions/`.
+
+### Evaluation
+
+The final step is to fill the predicted code into the cursor position and run the corresponding unit tests.
+
+After calling model and obtaining the predicted responses, we can run the following command to run the unit test:
+```
+myenv/bin/python src/evaluate.py --method evaluate_prediction --model codegemma_7b --mode prefix_suffix_full_complete_current_block_no_evidence --check-unittest
+```
+
+Thus, the result file `./predicts/prefix_suffix_full_complete_current_block_no_evidence/results/codegemma_7b.jsonl.x` will be generated. Then, users can use the following command to summarize the results:
+```
+myenv/bin/python src/evaluate.py --method print_scores --model codegemma_7b
+```
+
+
+## Experimental Results
+
+We evaluate some popular general LLMs and code LLMs on the sub dataset `Scene1.1` of the CodevBench dataset. The results are as follows:

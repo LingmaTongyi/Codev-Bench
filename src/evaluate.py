@@ -20,33 +20,7 @@ import threading
 import time
 
 
-NAS = '/mnt/coai_nas/qianhu/'
-SUB_MODULE_DICT = {
-    'AutoRAG': [''],
-    'EasyVolcap': [''],
-    'Generalizable-BEV': [''],
-    'Python-Type-Challenges': [''],
-    'UHGEval': [''],
-    'UniRef': ['external/davis2017-evaluation/', 'external/lvos-evaluation/'],
-    'XAgent': [''],
-    'camp_zipnerf': [''],
-    'contrastors': ['src', ''],
-    'deluder': [''],
-    'gaussian-splatting-lightning': [''],
-    'litdata': [''],
-    'microagents': [''],
-    'microsearch': [''],
-    'nlm-ingestor': ['nlm_ingestor'],
-    'ollama-python': [''],
-    'open-iris': ['src'],
-    'openlogprobs': [''],
-    'scepter': [''],
-    'searcharray': [''],
-    'skfolio': ['src', ''],
-    'stable-diffusion-webui-forge': [''],
-    'stable-fast': [''],
-    'tanuki_py': ['src', ''],
-}
+MAIN_DIR = '/mnt/coai_nas/qianhu/github/Codev-Bench/'
 SUBTYPE_2_MAINTYPE = {
     'METHOD': '函数',
     'IF': '判断逻辑块',
@@ -56,6 +30,7 @@ SUBTYPE_2_MAINTYPE = {
     'CATCH': '异常逻辑块',
     'STATEMENT': '普通语句',
 }
+N_PROCESS = 4
 
 
 class TimeoutError(Exception):
@@ -93,12 +68,12 @@ def preview_test_llms(
     """
     用llms进行预测
     """
-    main_dir = os.path.join(NAS, 'github/completion_benchmark/')
+    main_dir = MAIN_DIR
     source_code_dir = os.path.join(main_dir, 'Source_Code')
     copyed_source_code_dir = os.path.join(main_dir, 'Source_Code_Copy')
     cosine_path = os.path.join(main_dir, 'metadatas/test_file_cosine.output.csv')
     meta_dir = os.path.join(main_dir, 'metadatas/')
-    template_path = os.path.join(NAS, 'github/completion_benchmark/src/templates/llm_template.py')
+    template_path = os.path.join(main_dir, 'src/templates/llm_template.py')
     predicts_dir = os.path.join(main_dir, 'predicts', mode)
     predicts_path = os.path.join(predicts_dir, 'predictions', f'{model_name}.jsonl')
     pathlib.Path(predicts_path).parent.mkdir(parents=True, exist_ok=True)
@@ -299,13 +274,12 @@ def evaluate_prediction(
     """
     评测预测结果
     """
-    main_dir = os.path.join(NAS, 'github/completion_benchmark/')
+    main_dir = MAIN_DIR
     predicted_path = os.path.join(main_dir, 'predicts', mode, 'predictions', f'{model_name}.jsonl')
     log_dir = os.path.join(main_dir, 'predicts', mode, 'logs')
     pathlib.Path(log_dir).mkdir(parents=True, exist_ok=True)
     result_path = os.path.join(main_dir, 'predicts', mode, 'results', f'{model_name}.jsonl')
     pathlib.Path(result_path).parent.mkdir(parents=True, exist_ok=True)
-    main_dir = os.path.join(NAS, 'github/completion_benchmark/')
     source_code_dir = os.path.join(main_dir, 'Source_Code')
     copyed_source_code_dir = os.path.join(main_dir, 'Source_Code_Copy')
     meta_dir = os.path.join(main_dir, 'metadatas/')
@@ -328,6 +302,8 @@ def evaluate_prediction(
         for lid, line in enumerate(tqdm.tqdm(fo.readlines(), desc='evaluate')):
             data = json.loads(line)
             file_path = data['func_name'].split('#')[0]
+            file_path = file_path.replace(
+                '/mnt/coai_nas/qianhu/github/completion_benchmark/', MAIN_DIR)
             repo_name = file_path[len(source_code_dir)+1:].split('/')[0]
             if repo_name not in repo_test_dict:
                 repo_test_dict[repo_name] = []
@@ -340,7 +316,7 @@ def evaluate_prediction(
                 source_path = os.path.join(root, filename)
                 target_path = source_path.replace('Source_Code_Copy', 'Source_Code')
                 source_target_paths.append((source_path, target_path))
-    for source_path, target_path in tqdm.tqdm(source_target_paths, desc='初始化仓库'):
+    for source_path, target_path in tqdm.tqdm(source_target_paths, desc='init repo'):
         shutil.copy(source_path, target_path)
 
     @timeout(120)
@@ -352,7 +328,10 @@ def evaluate_prediction(
         predicted_file = prefix + predicted_code + suffix
         with open(file_path, 'w') as temp_fw:
             temp_fw.write(predicted_file)
-        log_path = os.path.join(log_dir, f"{data['func_name']}_{utid}.log")
+        func_name = data['func_name']
+        func_name = func_name.replace(
+            '/mnt/coai_nas/qianhu/github/completion_benchmark/', MAIN_DIR)
+        log_path = os.path.join(log_dir, f"{func_name}_{utid}.log")
         is_pass, _ = run_unit_test_command(test_item, log_path)
         # 恢复文件
         source_path = file_path.replace('Source_Code', 'Source_Code_Copy')
@@ -367,12 +346,16 @@ def evaluate_prediction(
         with open(result_path + f'.{procid}', 'w') as fw:
             datas = []
             for rid, repo_name in enumerate(repo_names):
+                if repo_name != 'searcharray':
+                    continue
                 if rid % n_proc != procid:
                     continue
                 for data in repo_test_dict[repo_name]:
                     datas.append(data)
             for data in tqdm.tqdm(datas, desc=f'evaluate {procid}/{n_proc}', position=procid):
                 file_path = data['func_name'].split('#')[0]
+                file_path = file_path.replace(
+                    '/mnt/coai_nas/qianhu/github/completion_benchmark/', MAIN_DIR)
                 if check_indent:
                     is_right_indent = judge_right_indent(data, block_dict)
                 else:
@@ -389,6 +372,8 @@ def evaluate_prediction(
                     is_test_passed = True
                     for utid, unit_test_id in enumerate(data['unit_test_ids']):
                         test_item = test_dict[unit_test_id]
+                        test_item['run_command'] = test_item['run_command'].replace(
+                            '/mnt/coai_nas/qianhu/github/completion_benchmark/', MAIN_DIR)
                         try:
                             is_pass = _run_one_unit_test(
                                 data, utid, test_item, file_path, log_dir)
@@ -404,7 +389,7 @@ def evaluate_prediction(
                     is_not_cross_line and is_empty)
                 fw.write(json.dumps(data, ensure_ascii=False) + '\n')
                 fw.flush()
-    n_process = 8
+    n_process = N_PROCESS
     processes = []
     for procid in range(n_process):
         p = multiprocessing.Process(
@@ -422,17 +407,15 @@ def print_scores(
     """
     获取结果
     """
-    main_dir = os.path.join(NAS, 'github/completion_benchmark/')
+    main_dir = MAIN_DIR
     result_path = os.path.join(main_dir, 'predicts', mode, 'results', f'{model_name}.jsonl')
     score_path = os.path.join(main_dir, 'predicts', mode, 'scores', f'{model_name}.jsonl')
     pathlib.Path(score_path).parent.mkdir(parents=True, exist_ok=True)
     eval_dict = {}
-    for procid in range(8):
+    for procid in range(N_PROCESS):
         with open(result_path + f'.{procid}', 'r') as fo:
             for line in fo:
                 data = json.loads(line)
-                # if '<|cursor|>' in data['response']:
-                #     continue
                 main_type = SUBTYPE_2_MAINTYPE[data['block_type']]
                 for mtype in [main_type, 'TOTAL']:
                     if mtype not in eval_dict:
@@ -447,104 +430,6 @@ def print_scores(
         eval_dict[main_type]['pass_rate'] = pass_rate = 100.0 * n_pass / n_all
         print(f"model_name={model_name}, type={main_type}, n_all={n_all}, n_pass={n_pass}, " \
             f"acc={pass_rate:.2f}%")
-
-def print_all_scores(
-        mode='prefix_suffix_full_complete_current_block_no_evidence'):
-    """
-    获取结果
-    """
-    from fuzzywuzzy import fuzz
-    main_dir = os.path.join(NAS, 'github/completion_benchmark/')
-    result_dir = os.path.join(main_dir, 'predicts', mode, 'results')
-    pass_rate_csv_path = os.path.join(main_dir, 'predicts', mode, 'all_scores', 'pass_rate.csv')
-    edit_sim_csv_path = os.path.join(main_dir, 'predicts', mode, 'all_scores', 'edit_sim.csv')
-    line_length_csv_path = os.path.join(main_dir, 'predicts', mode, 'all_scores', 'line_length.csv')
-    latency_csv_path = os.path.join(main_dir, 'predicts', mode, 'all_scores', 'latency.csv')
-    model_names = {}
-    for model_name in os.listdir(result_dir):
-        model_names[model_name.split('.jsonl')[0]] = None
-    
-    pass_rate_datas, edit_sim_datas, line_length_datas, latency_datas = [], [], [], []
-    model_name_dict = {
-        'gpt-4o-mini': 'gpt_4o_mini',
-        'claude-3.5-sonnet': 'claude_35_sonnet',
-        'deepseek-v2': 'deepseek_v2',
-        'mistral-123b': 'mistral_123b',
-        'yi-1.5-34b': 'yi_15_34b',
-        'qwen-2-54b-moe': 'qwen_2_54b_moe',
-        'qwen-2-72b': 'qwen_2_72b',
-        'llama-3.1-70b': 'llama_31_70b',
-        'llama-3.1-405b': 'llama_31_405b',
-        'codeqwen-1.5': 'codeqwen_15',
-        'deepseek-coder-v2-lite': 'deepseek_coder_v2_lite',
-        'codegeex-4-9b': 'codegeex_4_9b',
-        'starcoder-2-7b': 'starcoder_2_7b',
-        'codegemma-7b': 'codegemma_7b',
-        'lingma-completion': 'lingma_completion_v75',
-    }
-    for mname in tqdm.tqdm(list(model_name_dict.keys())):
-        model_name = model_name_dict[mname]
-        result_path = os.path.join(main_dir, 'predicts', mode, 'results', model_name + '.jsonl')
-        score_path = os.path.join(main_dir, 'predicts', mode, 'scores', model_name + '.jsonl')
-        pathlib.Path(score_path).parent.mkdir(parents=True, exist_ok=True)
-        eval_dict = {}
-        for procid in range(8):
-            with open(result_path + f'.{procid}', 'r') as fo:
-                for line in fo:
-                    data = json.loads(line)
-                    # if '<|cursor|>' in data['response']:
-                    #     continue
-                    edit_sim = fuzz.ratio(data['response'], data['middle'])
-                    line_length = len(data['response'].split('\n'))
-                    main_type = SUBTYPE_2_MAINTYPE[data['block_type']]
-                    for mtype in [main_type, 'TOTAL']:
-                        if mtype not in eval_dict:
-                            eval_dict[mtype] = {'n_all': 0, 'n_pass': 0,
-                                'es': 0, 'line_length': 0, 'latency': 0}
-                        if data['is_all_passed']:
-                            eval_dict[mtype]['n_pass'] += 1
-                        eval_dict[mtype]['es'] += edit_sim
-                        eval_dict[mtype]['latency'] += data.get('latency', 0)
-                        eval_dict[mtype]['line_length'] += line_length
-                        eval_dict[mtype]['n_all'] += 1
-        json.dump(eval_dict, open(score_path, 'w'), indent=4)
-        pass_rate_data = [mode, model_name]
-        edit_sim_data = [mode, model_name]
-        line_length_data = [mode, model_name]
-        latency_data = [mode, model_name]
-        for main_type in ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', 'TOTAL']:
-            if main_type not in eval_dict:
-                pass_rate = 0.0
-                edit_sim = 0.0
-                line_length = 0.0
-                latency = 0.0
-            else:
-                n_all = eval_dict[main_type]['n_all']
-                n_pass = eval_dict[main_type]['n_pass']
-                pass_rate = round(100.0 * n_pass / n_all, 2)
-                edit_sim = round(eval_dict[main_type]['es'] / n_all, 2)
-                avg_line_length = round(eval_dict[main_type]['line_length'] / n_all, 2)
-                avg_latency = round(eval_dict[main_type]['latency'] / n_all, 2)
-            pass_rate_data.append(pass_rate)
-            edit_sim_data.append(edit_sim)
-            line_length_data.append(avg_line_length)
-            latency_data.append(avg_latency)
-        pass_rate_datas.append(pass_rate_data)
-        edit_sim_datas.append(edit_sim_data)
-        line_length_datas.append(line_length_data)
-        latency_datas.append(latency_data)
-    df = pandas.DataFrame(pass_rate_datas,
-        columns=['场景名称', '模型名称'] + ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', '平均'])
-    df.to_csv(pass_rate_csv_path, index=False)
-    df = pandas.DataFrame(edit_sim_datas,
-        columns=['场景名称', '模型名称'] + ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', '平均'])
-    df.to_csv(edit_sim_csv_path, index=False)
-    df = pandas.DataFrame(line_length_datas,
-        columns=['场景名称', '模型名称'] + ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', '平均'])
-    df.to_csv(line_length_csv_path, index=False)
-    df = pandas.DataFrame(latency_datas,
-        columns=['场景名称', '模型名称'] + ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', '平均'])
-    df.to_csv(latency_csv_path, index=False)
 
 
 
@@ -578,5 +463,3 @@ if __name__ == '__main__':
             check_empty=args.check_empty)
     elif args.method == 'print_scores':
         print_scores(model_name=args.model, mode=args.mode)
-    elif args.method == 'print_all_scores':
-        print_all_scores(mode=args.mode)
