@@ -180,4 +180,6 @@ myenv/bin/python src/evaluate.py --method print_scores --model codegemma_7b
 
 ## Experimental Results
 
-We evaluate some popular general LLMs and code LLMs on the sub dataset `Scene1.1` of the CodevBench dataset. The results are as follows:
+We evaluate some popular general LLMs and code LLMs on the sub dataset **Scene1.1** of the CodevBench dataset. The results are as follows:
+
+![results of Scene1.1](images/prefix_suffix_full_complete_current_block_no_evidence.png)
