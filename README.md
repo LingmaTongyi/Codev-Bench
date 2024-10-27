@@ -13,23 +13,13 @@ In detail, first, We extract unit test classes and functions from real GitHub re
 
 We split the completion sub-scenes or capabilities that users may encounter while developing in an IDE into the following parts:
 
-> **Scene1**. &#9989; Completing complete code blocks (including functions, conditional logic blocks, loop logic blocks, comments, ordinary statements, etc.).
+> &#9989; **Scenario 1 - Full block completion**: In this scenario, the model is tasked with completing a full code block (e.g., function, if, for, try, or statement) based on a complete, unbroken surrounding context. To pass, the model must accurately complete the block and stop at the correct point, ensuring it passes the unit test successfully.
 
-- **Scene1.1**. &#9989; The context of the code block to be completed is fully complete.
+> &#9989; **Scenario 2 - Incomplete suffix completion**: Compared to Scenario 1, this scenario focuses on cases where the suffix content following the current cursor is incomplete. It covers two sub-cases: one where all the suffix content after the cursor in entire file is empty, and another where only the content within the current function body after the cursor is missing.
 
-- **Scene1.2**. &#9989; The context of the code block to be completed has an empty body, but the external context of the function is complete.
+> &#9989; **Scenario 3 - Inner block completion**: In this scenario, the model is required to complete a portion of code block based on a complete, unbroken surrounding context. In addition, 20% of the samples in this scenario have an empty ground truth, evaluating the ability to recognize when the current block is already complete and no further completion is needed.
 
-- **Scene1.3**. &#9989; The context following the code block to be completed is completely empty.
-
-> **Scene2**. &#9989; Completing a portion of code within a specific code block.
-
-- **Scene2.1**. &#9989; Complete a portion of code within the code block.
-
-- **Scene2.2**. &#9989; The code block is already complete and should not have any code added.
-
-> **Scene3**. &#128260; Completing code based on classes and functions defined in other files.
-
-> **Scene4**. &#128260; Completing code based on related and similar code within the project.
+> &#9989; **Scenario 4 - RAG-based completion**: In this scenario, the model builds upon the full block completion task by incorporating a Retrieval-Augmented Generation (RAG) module. The repository is partitioned into chunks, with only functions being considered as candidates. The function containing the current code is used as the query, and the query’s embedding is compared with the embeddings of the candidate functions. The top 3 most similar candidates are then inserted back into the prompt as hints to guide code generation.
 
 
 ## How To Use
@@ -93,19 +83,13 @@ If almost all the unit tests run successfully, reseachers and developers can pro
 
 We split the completion sub-scenes or capabilities as follows:
 
-**Scene1.1**: `./prompts/prefix_suffix_full_complete_current_block_no_evidence.jsonl` and `./prompts/prefix_suffix_full_complete_current_block_with_evidence.jsonl`
+**Scenario 1**: `./prompts/prefix_suffix_full_complete_current_block_no_evidence.jsonl`.
 
-**Scene1.2**: `./prompts/prefix_full_suffix_func_empty_complete_current_block_no_evidence.jsonl` and `./prompts/prefix_full_suffix_func_empty_complete_current_block_with_evidence.jsonl`
+**Scenario 2**: `./prompts/complete_current_header_inner_block_completion.jsonl` and `./prompts/complete_current_header_empty_completion.jsonl`.
 
-**Scene1.3**: `./prompts/prefix_full_suffix_empty_complete_current_block_no_evidence.jsonl` and `./prompts/prefix_full_suffix_empty_complete_current_block_with_evidence.jsonl`
+**Scenario 3**: `./prompts/prefix_full_suffix_func_empty_complete_current_block_no_evidence.jsonl` and `./prompts/prefix_full_suffix_empty_complete_current_block_no_evidence.jsonl`.
 
-**Scene2.1**: `./prompts/complete_current_header_inner_block_completion.jsonl`
-
-**Scene2.2**: `./prompts/complete_current_header_empty_completion.jsonl`
-
-**Scene3**: Look forward to it.
-
-**Scene4**: Look forward to it.
+**Scenario 4**: `./prompts/prefix_suffix_full_complete_current_block_with_repo_rag_oracle`.
 
 The structure of the prompts is as follows:
 ```
@@ -173,15 +157,36 @@ myenv/bin/python src/evaluate.py --method evaluate_prediction --model codegemma_
 ```
 
 Thus, the result file `./predicts/prefix_suffix_full_complete_current_block_no_evidence/results/codegemma_7b.jsonl.x` will be generated. Then, users can use the following command to summarize the results:
-```
-myenv/bin/python src/evaluate.py --method print_scores --model codegemma_7b
+```shell
+# for scenario 1
+myenv/bin/python src/evaluate.py --method print_all_scores --model codegemma_7b --mode prefix_suffix_full_complete_current_block_no_evidence
+# for scenario 2
+myenv/bin/python src/evaluate.py --method print_all_scores --model codegemma_7b --mode complete_current_header_inner_block_and_empty_completion
+# for scenario 3
+myenv/bin/python src/evaluate.py --method print_all_scores --model codegemma_7b --mode prefix_suffix_empty_current_block
+# for scenario 4
+myenv/bin/python src/evaluate.py --method print_all_scores --model codegemma_7b --mode prefix_suffix_full_complete_current_block_with_repo_rag_oracle
 ```
 
 
 ## Experimental Results
 
-### Scene1.1
+### Overall Results
 
-We evaluate some popular general LLMs and code LLMs on the sub dataset **Scene1.1** of the CodevBench dataset. The results are as follows:
+![overall results](images/total.png)
 
-![results of Scene1.1](images/prefix_suffix_full_complete_current_block_no_evidence.png)
+### The Results of Scenario 1
+
+![the results of scenario 1](images/scenario1.png)
+
+### The Results of Scenario 2
+
+![the results of scenario 2](images/scenario2.png)
+
+### The Results of Scenario 3
+
+![the results of scenario 3](images/scenario3.png)
+
+### The Results of Scenario 4
+
+![the results of scenario 4](images/scenario4.png)
