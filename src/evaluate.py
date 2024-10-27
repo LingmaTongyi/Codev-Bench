@@ -18,6 +18,7 @@ from request_model import \
 from prepare import filter_method_dict, run_unit_test_command
 import threading
 import time
+from fuzzywuzzy import fuzz
 
 
 MAIN_DIR = '/mnt/coai_nas/qianhu/github/Codev-Bench/'
@@ -431,6 +432,134 @@ def print_scores(
         print(f"model_name={model_name}, type={main_type}, n_all={n_all}, n_pass={n_pass}, " \
             f"acc={pass_rate:.2f}%")
 
+def print_all_scores(
+        mode='prefix_suffix_full_complete_current_block_no_evidence'):
+    """
+    获取结果
+    """
+    main_dir = MAIN_DIR
+    result_dir = os.path.join(main_dir, 'predicts', mode, 'results')
+    pass_rate_csv_path = os.path.join(main_dir, 'predicts', mode, 'all_scores', 'pass_rate.csv')
+    edit_sim_csv_path = os.path.join(main_dir, 'predicts', mode, 'all_scores', 'edit_sim.csv')
+    line_length_csv_path = os.path.join(main_dir, 'predicts', mode, 'all_scores', 'line_length.csv')
+    latency_csv_path = os.path.join(main_dir, 'predicts', mode, 'all_scores', 'latency.csv')
+    pathlib.Path(pass_rate_csv_path).parent.mkdir(parents=True, exist_ok=True)
+    model_names = {}
+    for model_name in os.listdir(result_dir):
+        model_names[model_name.split('.jsonl')[0]] = None
+    
+    pass_rate_datas, edit_sim_datas, line_length_datas, latency_datas = [], [], [], []
+    model_name_dict = {
+        'GPT-4': 'gpt_4',
+        'GPT-4o': 'gpt_4o',
+        'GPT-4o-mini': 'gpt_4o_mini',
+        'Claude-3.5-Sonnet': 'claude_35_sonnet',
+        'Deepseek-v2': 'deepseek_v2',
+        'Mistral-123b': 'mistral_123b',
+        'Yi-1.5-34b': 'yi_15_34b',
+        'Qwen-2-54b-moe': 'qwen_2_54b_moe',
+        'Qwen-2-72b': 'qwen_2_72b',
+        'Llama-3.1-70b': 'llama_31_70b',
+        'Llama-3.1-405b': 'llama_31_405b',
+        'Codeqwen-1.5': 'codeqwen_15',
+        'Deepseek-coder-v2-lite': 'deepseek_coder_v2_lite',
+        'Codegeex-4-9b': 'codegeex_4_9b',
+        'Starcoder-2-7b': 'starcoder_2_7b',
+        'Codegemma-7b': 'codegemma_7b',
+    }
+    for mname in tqdm.tqdm(list(model_name_dict.keys())):
+        model_name = model_name_dict[mname]
+        eval_dict = {}
+        if mode == 'prefix_suffix_full_complete_current_block_no_evidence':
+            sub_modes = ['prefix_suffix_full_complete_current_block_no_evidence']
+            n_samples = [400]
+        elif mode == 'prefix_suffix_empty_current_block':
+            sub_modes = [
+                'prefix_full_suffix_func_empty_complete_current_block_no_evidence',
+                'prefix_full_suffix_empty_complete_current_block_no_evidence',
+            ]
+            n_samples = [200, 200]
+        elif mode == 'complete_current_header_inner_block_and_empty_completion':
+            sub_modes = [
+                'complete_current_header_inner_block_completion',
+                'complete_current_header_empty_completion',
+            ]
+            n_samples = [300, 100]
+        elif mode == 'prefix_suffix_full_complete_current_block_with_repo_rag_oracle':
+            sub_modes = ['prefix_suffix_full_complete_current_block_with_repo_rag_oracle']
+            n_samples = [400]
+        for sub_mode, n_sample in zip(sub_modes, n_samples):
+            result_path = os.path.join(main_dir, 'predicts', sub_mode, 'results', model_name + '.jsonl')
+            pathlib.Path(result_path).parent.mkdir(parents=True, exist_ok=True)
+            for procid in range(N_PROCESS):
+                if not os.path.exists(result_path + f'.{procid}'):
+                    continue
+                with open(result_path + f'.{procid}', 'r') as fo:
+                    for line in fo.readlines()[0:n_sample]:
+                        data = json.loads(line)
+                        edit_sim = fuzz.ratio(data['response'], data['middle'])
+                        line_length = len(data['response'].split('\n'))
+                        main_type = SUBTYPE_2_MAINTYPE[data['block_type']]
+                        for mtype in [main_type, 'TOTAL']:
+                            if mtype not in eval_dict:
+                                eval_dict[mtype] = {'n_all': 0, 'n_pass': 0,
+                                    'es': 0, 'line_length': 0, 'latency': 0}
+                            if data['is_all_passed']:
+                                eval_dict[mtype]['n_pass'] += 1
+                            eval_dict[mtype]['es'] += edit_sim
+                            eval_dict[mtype]['latency'] += data.get('latency', 0)
+                            eval_dict[mtype]['line_length'] += line_length
+                            eval_dict[mtype]['n_all'] += 1
+        pass_rate_data = [mode, mname]
+        edit_sim_data = [mode, mname]
+        line_length_data = [mode, mname]
+        latency_data = [mode, mname]
+        for main_type in ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', 'TOTAL']:
+            if main_type not in eval_dict:
+                pass_rate = 0.0
+                edit_sim = 0.0
+                avg_line_length = 0.0
+                avg_latency = 0.0
+            else:
+                n_all = eval_dict[main_type]['n_all']
+                n_pass = eval_dict[main_type]['n_pass']
+                pass_rate = round(100.0 * n_pass / n_all, 2)
+                avg_line_length = round(eval_dict[main_type]['line_length'] / n_all, 2)
+                edit_sim = round(eval_dict[main_type]['es'] / n_all, 2)
+                avg_latency = round(eval_dict[main_type]['latency'] / n_all, 2)
+            pass_rate_data.append(pass_rate)
+            edit_sim_data.append(edit_sim)
+            line_length_data.append(avg_line_length)
+            latency_data.append(avg_latency)
+        pass_rate_datas.append(pass_rate_data)
+        edit_sim_datas.append(edit_sim_data)
+        line_length_datas.append(line_length_data)
+        latency_datas.append(latency_data)
+    df = pandas.DataFrame(pass_rate_datas,
+        columns=['场景名称', 'Model'] + ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', 'Average'])
+    df.to_csv(pass_rate_csv_path, index=False)
+    print('-' * 50, ' pass rate ', '-' * 50)
+    print(df)
+    print()
+    df = pandas.DataFrame(edit_sim_datas,
+        columns=['场景名称', 'Model'] + ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', 'Average'])
+    df.to_csv(edit_sim_csv_path, index=False)
+    print('-' * 50, ' edit similarity ', '-' * 50)
+    print(df)
+    print()
+    df = pandas.DataFrame(line_length_datas,
+        columns=['场景名称', 'Model'] + ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', 'Average'])
+    df.to_csv(line_length_csv_path, index=False)
+    print('-' * 50, ' line length ', '-' * 50)
+    print(df)
+    print()
+    df = pandas.DataFrame(latency_datas,
+        columns=['场景名称', 'Model'] + ['函数', '判断逻辑块', '循环逻辑块', '异常逻辑块', '普通语句', 'Average'])
+    df.to_csv(latency_csv_path, index=False)
+    print('-' * 50, ' latency ', '-' * 50)
+    print(df)
+    print()
+
 
 
 if __name__ == '__main__':
@@ -444,8 +573,11 @@ if __name__ == '__main__':
         'prefix_suffix_full_complete_current_block_with_evidence',
         'prefix_full_suffix_func_empty_complete_current_block_no_evidence',
         'prefix_full_suffix_empty_complete_current_block_no_evidence',
+        'prefix_suffix_empty_current_block',
         'complete_current_header_inner_block_completion',
-        'complete_current_header_empty_completion'],
+        'complete_current_header_empty_completion',
+        'complete_current_header_inner_block_and_empty_completion',
+        'prefix_suffix_full_complete_current_block_with_repo_rag_oracle'],
         default='prefix_suffix_full_complete_current_block_no_evidence')
     parser.add_argument("--check-unittest", action='store_true')
     parser.add_argument("--check-indent", action='store_true')
@@ -463,3 +595,5 @@ if __name__ == '__main__':
             check_empty=args.check_empty)
     elif args.method == 'print_scores':
         print_scores(model_name=args.model, mode=args.mode)
+    elif args.method == 'print_all_scores':
+        print_all_scores(mode=args.mode)
