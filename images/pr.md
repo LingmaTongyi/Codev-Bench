@@ -4,7 +4,7 @@ Codev-Bench: How Do LLMs Understand Develop-Centric Code Completion?
 
 **论文作者：**
 
-潘震宇，曹荣禹，曹永昌，马迎伟，黎槟华，黄非，，李永彬
+潘震宇，曹荣禹，曹永昌，马迎伟，黎槟华，黄非，刘晗，李永彬
 
 **论文链接：**
 
