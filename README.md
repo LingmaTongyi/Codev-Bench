@@ -1,4 +1,13 @@
-# Codev-Bench
+<p align="center">
+    <img src="https://github.com/LingmaTongyi/Codev-Bench/blob/main/images/pr2.png?raw=true" width="800"/>
+<p>
+
+<p align="center">
+        🤗 <a href="https://huggingface.co/datasets/TongyiLingma/CodevBench">Hugging Face</a>&nbsp&nbsp | &nbsp&nbsp🤖 <a href="https://www.modelscope.cn/datasets/Lingma/CodevBench">ModelScope</a>&nbsp&nbsp | &nbsp&nbsp 📑 <a href="https://github.com/LingmaTongyi/Codev-Bench">GitHub</a> &nbsp&nbsp ｜ &nbsp&nbsp📄<a href="https://arxiv.org/abs/2410.01353v3">Arxiv</a> &nbsp&nbsp
+</p>
+
+
+# Codev-Bench: How Do LLMs Understand Developer-Centric Code Completion?
 
 ## Introduction
 Codev-Bench (Code Development Benchmark), a fine-grained, real-world, repository-level, and developer-centric evaluation framework. Codev-Bench assesses whether a code completion tool can accurately capture a developer's immediate intent and suggest appropriate code snippets across diverse, fine-grained contexts.
@@ -173,20 +182,33 @@ myenv/bin/python src/evaluate.py --method print_all_scores --model codegemma_7b 
 
 ### Overall Results
 
-![overall results](images/total.png)
+![overall results](https://github.com/LingmaTongyi/Codev-Bench/raw/main/images/total.png)
 
 ### The Results of Scenario 1
 
-![the results of scenario 1](images/scenario1.png)
+![the results of scenario 1](https://github.com/LingmaTongyi/Codev-Bench/raw/main/images/scenario1.png)
 
 ### The Results of Scenario 2
 
-![the results of scenario 2](images/scenario2.png)
+![the results of scenario 2](https://github.com/LingmaTongyi/Codev-Bench/raw/main/images/scenario2.png)
 
 ### The Results of Scenario 3
 
-![the results of scenario 3](images/scenario3.png)
+![the results of scenario 3](https://github.com/LingmaTongyi/Codev-Bench/raw/main/images/scenario3.png)
 
 ### The Results of Scenario 4
 
-![the results of scenario 4](images/scenario4.png)
+![the results of scenario 4](https://github.com/LingmaTongyi/Codev-Bench/raw/main/images/scenario4.png)
+
+
+# Citation
+
+If you use this dataset in your research, please cite the following paper:
+
+```bibtex
+@article{pan2024codev,
+  title={Codev-Bench: How Do LLMs Understand Developer-Centric Code Completion?},
+  author={Pan, Zhenyu and Cao, Rongyu and Cao, Yongchang and Ma, Yingwei and Li, Binhua and Huang, Fei and Liu, Han and Li, Yongbin},
+  journal={arXiv preprint arXiv:2410.01353},
+  year={2024}
+}
